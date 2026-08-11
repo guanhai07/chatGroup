@@ -78,7 +78,8 @@ chatRoutes.post('/:sessionId', async (req, res) => {
   await saveMessage(sessionId, 'user', message, { providerId, model });
   // Auto-title from first message
   if (session.title === 'New Session') {
-    const newTitle = message.trim().slice(0, 40) + (message.trim().length > 40 ? '...' : '');
+    const trimmed = message.trim().replace(/\s+/g, ' ');
+    const newTitle = trimmed.slice(0, 18) + (trimmed.length > 18 ? '…' : '');
     db.prepare('UPDATE sessions SET title = ?, updated_at = ? WHERE id = ?').run(newTitle, Date.now(), sessionId);
   }
 

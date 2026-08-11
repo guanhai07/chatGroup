@@ -94,7 +94,8 @@ discussionRoutes.post('/:sessionId', async (req, res) => {
   await saveMessage(sessionId, 'user', initialPrompt, {});
   // Auto-title from initial prompt
   if (session.title === 'New Session') {
-    const newTitle = initialPrompt.trim().slice(0, 40) + (initialPrompt.trim().length > 40 ? '...' : '');
+    const trimmed = initialPrompt.trim().replace(/\s+/g, ' ');
+    const newTitle = trimmed.slice(0, 18) + (trimmed.length > 18 ? '…' : '');
     db.prepare('UPDATE sessions SET title = ?, updated_at = ? WHERE id = ?').run(newTitle, Date.now(), sessionId);
   }
 

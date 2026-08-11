@@ -373,48 +373,61 @@ export function DiscussionPage() {
 
       <div className="discussion-main">
         <section className="surface discussion-config">
-          <span className="eyebrow">DISCUSSION / MULTI MODEL</span>
-          <h1>多模型讨论</h1>
-          <p>选择多个模型轮流发言。历史会保存在左侧，切换菜单后也可恢复。</p>
-
-          <div className="selection-header">
-            <strong>参与模型</strong>
-            <button className="button button-ghost" onClick={addSelection} type="button">+ 添加</button>
-          </div>
-          <div className="selection-list">
-            {selections.length === 0 && <span className="muted">点击添加，选择要参与讨论的模型</span>}
-            {selections.map((selection) => {
-              const provider = providers.find((item) => item.id === selection.providerId);
-              return (
-                <div className="selection-row" key={selection.key}>
-                  <select value={selection.providerId} onChange={(event) => updateSelection(selection.key, 'providerId', event.target.value)}>
-                    {enabledProviders.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
-                  <select value={selection.model} onChange={(event) => updateSelection(selection.key, 'model', event.target.value)}>
-                    {(provider?.models || []).map((item) => <option key={item} value={item}>{item}</option>)}
-                  </select>
-                  <button className="remove-selection" onClick={() => removeSelection(selection.key)} type="button" aria-label="移除">×</button>
-                </div>
-              );
-            })}
+          <div className="discussion-config-top">
+            <div>
+              <span className="eyebrow">DISCUSSION / MULTI MODEL</span>
+              <h1>多模型讨论</h1>
+              <p>配置模型与主题后开始讨论；左侧可管理历史记录。</p>
+            </div>
           </div>
 
-          <label className="field discussion-field">
-            <span>轮数</span>
-            <input type="number" min={1} max={10} value={rounds} onChange={(event) => setRounds(Number(event.target.value) || 1)} />
-          </label>
-          <label className="field discussion-field">
-            <span>系统提示词（可选）</span>
-            <input value={systemPrompt} onChange={(event) => setSystemPrompt(event.target.value)} placeholder="给所有模型的共同约束" />
-          </label>
-          <label className="field discussion-field">
-            <span>讨论主题</span>
-            <textarea className="discussion-prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="输入一个值得讨论的问题" disabled={running} />
-          </label>
-          <button className="button button-primary discussion-run" onClick={() => void run()} disabled={running || !prompt.trim()}>
-            {running ? '讨论进行中…' : '开始讨论'}
-          </button>
-          {error && <div className="alert alert-error" style={{ marginTop: 12 }}><span>!</span>{error}</div>}
+          <div className="discussion-config-grid">
+            <div className="discussion-config-models">
+              <div className="selection-header">
+                <strong>参与模型</strong>
+                <button className="button button-ghost" onClick={addSelection} type="button">+ 添加</button>
+              </div>
+              <div className="selection-list">
+                {selections.length === 0 && <span className="muted">点击添加参与讨论的模型</span>}
+                {selections.map((selection) => {
+                  const provider = providers.find((item) => item.id === selection.providerId);
+                  return (
+                    <div className="selection-row" key={selection.key}>
+                      <select value={selection.providerId} onChange={(event) => updateSelection(selection.key, 'providerId', event.target.value)}>
+                        {enabledProviders.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                      </select>
+                      <select value={selection.model} onChange={(event) => updateSelection(selection.key, 'model', event.target.value)}>
+                        {(provider?.models || []).map((item) => <option key={item} value={item}>{item}</option>)}
+                      </select>
+                      <button className="remove-selection" onClick={() => removeSelection(selection.key)} type="button" aria-label="移除">×</button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="discussion-config-prompt">
+              <label className="field discussion-field">
+                <span>讨论主题</span>
+                <textarea className="discussion-prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="输入一个值得讨论的问题" disabled={running} />
+              </label>
+              <label className="field discussion-field">
+                <span>系统提示词（可选）</span>
+                <input value={systemPrompt} onChange={(event) => setSystemPrompt(event.target.value)} placeholder="给所有模型的共同约束" />
+              </label>
+            </div>
+
+            <div className="discussion-config-actions">
+              <label className="field discussion-field">
+                <span>轮数</span>
+                <input type="number" min={1} max={10} value={rounds} onChange={(event) => setRounds(Number(event.target.value) || 1)} />
+              </label>
+              <button className="button button-primary discussion-run" onClick={() => void run()} disabled={running || !prompt.trim()}>
+                {running ? '讨论进行中…' : '开始讨论'}
+              </button>
+              {error && <div className="alert alert-error"><span>!</span>{error}</div>}
+            </div>
+          </div>
         </section>
 
         <section className="discussion-result">
