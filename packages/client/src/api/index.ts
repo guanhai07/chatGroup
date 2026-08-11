@@ -12,6 +12,15 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+function normalizeSession(row: any): Session {
+  return {
+    id: row.id,
+    title: row.title || '未命名',
+    createdAt: row.createdAt ?? row.created_at ?? 0,
+    updatedAt: row.updatedAt ?? row.updated_at ?? 0,
+  };
+}
+
 export type StreamEvent = {
   type: string;
   content?: string;
@@ -100,7 +109,7 @@ export const api = {
 
   // Chat
   createChatSession: () => request<{ id: string }>('/api/chat/sessions', { method: 'POST' }),
-  listChatSessions: () => request<Session[]>('/api/chat/sessions'),
+  listChatSessions: async () => (await request<any[]>('/api/chat/sessions')).map(normalizeSession),
   getChatSession: (id: string) => request<{ session: Session; messages: any[] }>(`/api/chat/sessions/${id}`),
   deleteChatSession: (id: string) => request<{ success: boolean }>(`/api/chat/sessions/${id}`, { method: 'DELETE' }),
   renameChatSession: (id: string, title: string) =>
@@ -108,10 +117,17 @@ export const api = {
 
   // Discussion
   createDiscussionSession: () => request<{ id: string }>('/api/discussion/sessions', { method: 'POST' }),
-  listDiscussionSessions: () => request<Session[]>('/api/discussion/sessions'),
-  getDiscussionSession: (id: string) =>
-    request<{ session: Session; messages: any[] }>(`/api/discussion/sessions/${id}`),
+  listDiscussionSessions: async () => (await request<any[]>('/api/discussion/sessions')).map(normalizeSession),
+  getDiscussionSession: async (id: string) => {
+    const data = await request<{ session: any; messages: any[] }>(`/api/discussion/sessions/${id}`);
+    return { session: normalizeSession(data.session), messages: data.messages };
+  },
+  deleteDiscussionSession: (id: string) =>
+    request<{ success: boolean }>(`/api/discussion/sessions/${id}`, { method: 'DELETE' }),
+  renameDiscussionSession: (id: string, title: string) =>
+    request<{ success: boolean }>(`/api/discussion/sessions/${id}`, { method: 'PUT', body: JSON.stringify({ title }) }),
 };
+
 
 export function streamChat(
   sessionId: string,

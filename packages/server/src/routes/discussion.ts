@@ -31,6 +31,25 @@ discussionRoutes.get('/sessions', (_req, res) => {
   res.json(rows);
 });
 
+// Delete discussion session
+discussionRoutes.delete('/sessions/:id', (req, res) => {
+  const { id } = req.params;
+  const db = getDb();
+  db.prepare('DELETE FROM messages WHERE session_id = ?').run(id);
+  db.prepare('DELETE FROM sessions WHERE id = ? AND type = ?').run(id, 'discussion');
+  res.json({ success: true });
+});
+
+// Rename discussion session
+discussionRoutes.put('/sessions/:id', (req, res) => {
+  const { id } = req.params;
+  const { title } = req.body;
+  if (!title) return res.status(400).json({ error: 'title is required' });
+  const db = getDb();
+  db.prepare('UPDATE sessions SET title = ?, updated_at = ? WHERE id = ? AND type = ?').run(title, Date.now(), id, 'discussion');
+  res.json({ success: true });
+});
+
 // Get session messages
 discussionRoutes.get('/sessions/:id', (req, res) => {
   const session = getSession(req.params.id);
@@ -148,7 +167,7 @@ discussionRoutes.post('/:sessionId', async (req, res) => {
     let summary = '';
     try {
       const first = providerModels[0];
-    const firstProvider = providers.get(first.providerId);
+      const firstProvider = providers.get(first.providerId);
       if (!firstProvider) {
         throw new Error(`Provider ${first.providerId} not found`);
       }
@@ -158,6 +177,7 @@ discussionRoutes.post('/:sessionId', async (req, res) => {
         providerId: first.providerId,
         model: first.model,
         round: rounds + 1,
+        usage: { kind: 'summary' } as any,
       });
     } catch (e: any) {
       summary = `[Summary failed: ${e.message}]`;

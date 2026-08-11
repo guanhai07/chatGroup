@@ -18,7 +18,7 @@ export default function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">C<span>G</span></div>
+          <div className="brand-mark" aria-hidden="true"><span className="brand-c">C</span><span className="brand-g">G</span></div>
           <div><strong>Chat Group</strong><small>LOCAL AI WORKSPACE</small></div>
         </div>
         <div className="sidebar-label">工作区</div>

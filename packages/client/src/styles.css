@@ -28,8 +28,9 @@ button:disabled { cursor: not-allowed; opacity: 0.58; }
 .app-shell { display: flex; min-height: 100vh; background: #f4f6f8; }
 .sidebar { width: 260px; flex: 0 0 260px; display: flex; flex-direction: column; padding: 28px 18px 18px; color: #d9e4f1; background: #152331; }
 .brand { display: flex; align-items: center; gap: 11px; padding: 0 12px 38px; }
-.brand-mark { width: 38px; height: 38px; display: grid; place-items: center; color: #fff; background: #2e83f6; border-radius: 12px; font-size: 16px; font-weight: 800; letter-spacing: -2px; box-shadow: 0 8px 20px rgba(46, 131, 246, 0.28); }
-.brand-mark span { color: #93c4ff; }
+.brand-mark { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; color: #fff; background: #2e83f6; border-radius: 12px; font-size: 14px; font-weight: 800; letter-spacing: -0.6px; line-height: 1; white-space: nowrap; box-shadow: 0 8px 20px rgba(46, 131, 246, 0.28); }
+.brand-mark .brand-c, .brand-mark .brand-g { display: inline; line-height: 1; }
+.brand-mark .brand-g { color: #93c4ff; }
 .brand strong { display: block; color: #fff; font-size: 15px; letter-spacing: -0.2px; }
 .brand small { display: block; margin-top: 3px; color: #71869a; font-family: 'DM Mono', monospace; font-size: 8px; letter-spacing: 1px; }
 .sidebar-label, .section-kicker, .eyebrow { color: #8294a7; font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase; }
@@ -131,9 +132,16 @@ h1, h2, h3, p { margin: 0; }
 .session-item:hover { background: #f4f8fc; }
 .session-item.is-active { color: #245eaa; background: #edf5ff; }
 .session-title { min-width: 0; flex: 1; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.session-delete { flex: 0 0 auto; border: 0; color: #adb7c0; background: transparent; font-size: 12px; }
-.session-delete:hover { color: var(--danger); }
 .session-edit { width: 100%; padding: 4px 6px; border: 1px solid #bcd5f3; border-radius: 5px; outline: 0; font-size: 11px; }
+.session-actions { display: flex; flex: 0 0 auto; gap: 1px; opacity: 0; }
+.session-item:hover .session-actions, .session-item.is-active .session-actions { opacity: 1; }
+.session-rename, .session-delete { flex: 0 0 auto; width: 22px; height: 22px; border: 0; border-radius: 6px; color: #adb7c0; background: transparent; font-size: 11px; line-height: 1; }
+.session-rename:hover { color: #2e83f6; background: #edf5ff; }
+.session-delete:hover { color: var(--danger); background: #fff1f2; }
+.session-item.is-streaming .session-title::after { content: ' ·'; font-size: 10px; color: #2e83f6; }
+.discussion-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 25px; align-items: start; }
+.discussion-main { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 25px; min-width: 0; align-items: start; }
+
 .chat-workspace { display: flex; min-width: 0; flex-direction: column; }
 .workspace-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
 .workspace-heading h1 { margin-top: 7px; font-size: 26px; letter-spacing: -1px; }
@@ -164,7 +172,6 @@ h1, h2, h3, p { margin: 0; }
 .chat-input { min-height: 58px; max-height: 160px; resize: vertical; padding: 11px 13px; font-size: 12px; line-height: 1.5; }
 .send-button { align-self: stretch; min-width: 82px; }
 
-.discussion-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 25px; align-items: start; }
 .discussion-config { padding: 21px; }
 .discussion-config h1 { margin-top: 7px; font-size: 26px; letter-spacing: -1px; }
 .discussion-config > p { margin-top: 7px; color: var(--muted); font-size: 12px; line-height: 1.6; }
@@ -198,7 +205,7 @@ h1, h2, h3, p { margin: 0; }
 @media (max-width: 980px) {
   .sidebar { width: 220px; flex-basis: 220px; }
   .content-area, .topbar { padding-left: 28px; padding-right: 28px; }
-  .provider-layout, .discussion-layout { grid-template-columns: 1fr; }
+  .provider-layout, .discussion-layout, .discussion-main { grid-template-columns: 1fr; }
   .editor-panel { position: static; }
   .discussion-config { order: 0; }
 }

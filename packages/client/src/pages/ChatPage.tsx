@@ -21,11 +21,29 @@ export function ChatPage() {
   const [input, setInput] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [sessionId, setSessionId] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [streamingIds, setStreamingIds] = useState<Set<string>>(new Set());
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editTitleValue, setEditTitleValue] = useState('');
   const [error, setError] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const sessionIdRef = useRef(sessionId);
+  const abortsRef = useRef<Map<string, () => void>>(new Map());
+  const draftMessagesRef = useRef<Map<string, LocalMessage[]>>(new Map());
+
+  sessionIdRef.current = sessionId;
+  useEffect(() => {
+    if (sessionId) localStorage.setItem('cg:lastChatSessionId', sessionId);
+  }, [sessionId]);
+  const currentBusy = !!sessionId && streamingIds.has(sessionId);
+
+  const markStreaming = (id: string, active: boolean) => {
+    setStreamingIds((prev) => {
+      const next = new Set(prev);
+      if (active) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
 
   const loadSessions = async () => {
     try {
@@ -44,7 +62,26 @@ export function ChatPage() {
         setModel(firstEnabled.models[0]);
       }
     }).catch((e: any) => setError(e.message || '加载站点失败'));
-    void loadSessions();
+
+    (async () => {
+      try {
+        const list = await api.listChatSessions();
+        setSessions(list);
+        const lastId = localStorage.getItem('cg:lastChatSessionId');
+        if (lastId && list.some((session) => session.id === lastId)) {
+          const data = await api.getChatSession(lastId);
+          setSessionId(lastId);
+          setMessages(data.messages.map((message: any) => ({
+            role: message.role,
+            content: message.content,
+            providerId: message.provider_id ?? message.providerId,
+            model: message.model,
+          })));
+        }
+      } catch (e: any) {
+        setError(e.message || '加载会话失败');
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -55,31 +92,56 @@ export function ChatPage() {
     const { id } = await api.createChatSession();
     setSessionId(id);
     setMessages([]);
+    draftMessagesRef.current.set(id, []);
+    setError('');
+    setEditingTitleId(null);
     await loadSessions();
     return id;
   };
 
   const openSession = async (id: string) => {
+    if (id === sessionId) return;
     try {
       setSessionId(id);
-      const data = await api.getChatSession(id);
-      setMessages(data.messages.map((message: any) => ({
-        role: message.role,
-        content: message.content,
-        providerId: message.provider_id,
-        model: message.model,
-      })));
+      setEditingTitleId(null);
+      const draft = draftMessagesRef.current.get(id);
+      if (draft) {
+        setMessages(draft.map((message) => ({ ...message })));
+      } else {
+        const data = await api.getChatSession(id);
+        setMessages(data.messages.map((message: any) => ({
+          role: message.role,
+          content: message.content,
+          providerId: message.provider_id ?? message.providerId,
+          model: message.model,
+        })));
+      }
       setError('');
     } catch (e: any) {
       setError(e.message || '打开会话失败');
     }
   };
 
+  const beginRename = (session: Session) => {
+    setEditingTitleId(session.id);
+    setEditTitleValue(session.title || '');
+  };
+
+  const cancelRename = () => {
+    setEditingTitleId(null);
+    setEditTitleValue('');
+  };
+
   const renameSession = async (id: string, title: string) => {
-    if (!title.trim()) return;
+    const next = title.trim();
+    if (!next) {
+      cancelRename();
+      return;
+    }
     try {
-      await api.renameChatSession(id, title.trim());
-      setEditingTitleId(null);
+      await api.renameChatSession(id, next);
+      setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, title: next } : s)));
+      cancelRename();
       await loadSessions();
     } catch (e: any) {
       setError(e.message || '重命名失败');
@@ -89,6 +151,10 @@ export function ChatPage() {
   const deleteSession = async (id: string) => {
     if (!confirm('确认删除该会话?')) return;
     try {
+      abortsRef.current.get(id)?.();
+      abortsRef.current.delete(id);
+      draftMessagesRef.current.delete(id);
+      markStreaming(id, false);
       await api.deleteChatSession(id);
       await loadSessions();
       if (sessionId === id) {
@@ -101,9 +167,8 @@ export function ChatPage() {
   };
 
   const send = async () => {
-    if (!input.trim() || busy || !providerId || !model) return;
+    if (!input.trim() || currentBusy || !providerId || !model) return;
     setError('');
-    setBusy(true);
 
     try {
       let sid = sessionId;
@@ -111,43 +176,54 @@ export function ChatPage() {
 
       const userMsg: LocalMessage = { role: 'user', content: input.trim(), providerId, model };
       const assistantMsg: LocalMessage = { role: 'assistant', content: '', providerId, model, streaming: true };
-      setMessages((ms) => [...ms, userMsg, assistantMsg]);
+      const baseMessages = [...(draftMessagesRef.current.get(sid) || messages), userMsg, assistantMsg];
+      draftMessagesRef.current.set(sid, baseMessages);
+      setMessages(baseMessages.map((message) => ({ ...message })));
       setInput('');
+      markStreaming(sid, true);
 
-      streamChat(sid, { providerId, model, message: userMsg.content, systemPrompt }, (event) => {
+      const patchDraft = (updater: (ms: LocalMessage[]) => void) => {
+        const current = draftMessagesRef.current.get(sid) || [];
+        const copy = current.map((message) => ({ ...message }));
+        updater(copy);
+        draftMessagesRef.current.set(sid, copy);
+        if (sessionIdRef.current === sid) {
+          setMessages(copy.map((message) => ({ ...message })));
+        }
+      };
+
+      const abort = streamChat(sid, { providerId, model, message: userMsg.content, systemPrompt }, (event) => {
         if (event.type === 'delta') {
-          setMessages((ms) => {
-            const copy = [...ms];
-            const last = copy[copy.length - 1];
+          patchDraft((ms) => {
+            const last = ms[ms.length - 1];
             if (last?.streaming) last.content += event.content || '';
-            return copy;
           });
         } else if (event.type === 'error') {
-          setMessages((ms) => {
-            const copy = [...ms];
-            const last = copy[copy.length - 1];
+          patchDraft((ms) => {
+            const last = ms[ms.length - 1];
             if (last?.streaming) {
               last.streaming = false;
               last.content += `\n\n[错误] ${event.message || '请求失败'}`;
             }
-            return copy;
           });
-          setBusy(false);
-          setError(event.message || '请求失败');
+          if (sessionIdRef.current === sid) setError(event.message || '请求失败');
         } else if (event.type === 'done') {
-          setMessages((ms) => {
-            const copy = [...ms];
-            const last = copy[copy.length - 1];
+          patchDraft((ms) => {
+            const last = ms[ms.length - 1];
             if (last?.streaming) last.streaming = false;
-            return copy;
           });
-          setBusy(false);
           void loadSessions();
+        } else if (event.type === 'settled') {
+          markStreaming(sid, false);
+          abortsRef.current.delete(sid);
+          // Keep final draft until next open reloads from DB if needed
         }
       });
+
+      abortsRef.current.set(sid, abort);
     } catch (e: any) {
-      setBusy(false);
       setError(e.message || '发送失败');
+      if (sessionId) markStreaming(sessionId, false);
     }
   };
 
@@ -164,7 +240,7 @@ export function ChatPage() {
           {sessions.length === 0 && <span className="muted">还没有历史会话</span>}
           {sessions.map((session) => (
             <div
-              className={`session-item ${sessionId === session.id ? 'is-active' : ''}`}
+              className={`session-item ${sessionId === session.id ? 'is-active' : ''} ${streamingIds.has(session.id) ? 'is-streaming' : ''}`}
               key={session.id}
               onClick={() => { if (editingTitleId !== session.id) void openSession(session.id); }}
               role="button"
@@ -177,21 +253,40 @@ export function ChatPage() {
                   value={editTitleValue}
                   onChange={(event) => setEditTitleValue(event.target.value)}
                   onKeyDown={(event) => {
-                    if (event.key === 'Enter') { event.stopPropagation(); void renameSession(session.id, editTitleValue); }
-                    if (event.key === 'Escape') setEditingTitleId(null);
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      void renameSession(session.id, editTitleValue);
+                    }
+                    if (event.key === 'Escape') {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      cancelRename();
+                    }
                   }}
                   onBlur={() => void renameSession(session.id, editTitleValue)}
                   onClick={(event) => event.stopPropagation()}
                   autoFocus
                 />
               ) : (
-                <span
-                  className="session-title"
-                  onDoubleClick={(event) => { event.stopPropagation(); setEditingTitleId(session.id); setEditTitleValue(session.title); }}
-                  title="双击重命名"
-                >{session.title}</span>
+                <>
+                  <span className="session-title" title={session.title}>{session.title || '未命名会话'}</span>
+                  <div className="session-actions">
+                    <button
+                      className="session-rename"
+                      onClick={(event) => { event.stopPropagation(); beginRename(session); }}
+                      title="重命名"
+                      aria-label="重命名"
+                    >✎</button>
+                    <button
+                      className="session-delete"
+                      onClick={(event) => { event.stopPropagation(); void deleteSession(session.id); }}
+                      title="删除会话"
+                      aria-label="删除会话"
+                    >×</button>
+                  </div>
+                </>
               )}
-              <button className="session-delete" onClick={(event) => { event.stopPropagation(); void deleteSession(session.id); }} title="删除会话" aria-label="删除会话">×</button>
             </div>
           ))}
         </div>
@@ -202,9 +297,9 @@ export function ChatPage() {
           <div>
             <span className="eyebrow">CONVERSATION / SINGLE MODEL</span>
             <h1>单模型对话</h1>
-            <p>选择一个模型，开始一段可持续的对话。</p>
+            <p>选择一个模型，开始一段可持续的对话。生成中的会话不会锁死其他会话。</p>
           </div>
-          {busy && <span className="round-badge"><span className="online-dot" />生成中</span>}
+          {currentBusy && <span className="round-badge"><span className="online-dot" />生成中</span>}
         </div>
 
         {error && <div className="alert alert-error"><span>!</span>{error}</div>}
@@ -221,7 +316,9 @@ export function ChatPage() {
             }}
           >
             <option value="">选择站点</option>
-            {providers.filter((provider) => provider.enabled).map((provider) => <option key={provider.id} value={provider.id}>{provider.name}</option>)}
+            {providers.filter((provider) => provider.enabled).map((provider) => (
+              <option key={provider.id} value={provider.id}>{provider.name}</option>
+            ))}
           </select>
           <select className="control-select" value={model} onChange={(event) => setModel(event.target.value)} disabled={!activeProvider}>
             <option value="">选择模型</option>
@@ -245,11 +342,12 @@ export function ChatPage() {
                       remarkPlugins={[remarkGfm]}
                       components={{
                         code: ({ className, children, ...props }: any) => className
-                          ? <pre><code className={className} {...props}>{children}</code></pre>
-                          : <code {...props}>{children}</code>,
-                        a: ({ href, children }: any) => <a href={href} target="_blank" rel="noreferrer">{children}</a>,
+                          ? <pre className="md-code-block"><code className={className} {...props}>{children}</code></pre>
+                          : <code className="md-inline-code" {...props}>{children}</code>,
                       }}
-                    >{message.content || ' '}</ReactMarkdown>
+                    >
+                      {message.content}
+                    </ReactMarkdown>
                   )}
                 </div>
               </div>
@@ -260,15 +358,20 @@ export function ChatPage() {
 
         <div className="chat-composer">
           <textarea
-            className="chat-input"
+            className="control-input chat-input"
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } }}
-            placeholder="输入消息，Enter 发送，Shift+Enter 换行"
-            disabled={busy}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                void send();
+              }
+            }}
+            placeholder={currentBusy ? '当前会话生成中，可新建或切换其他会话继续聊…' : '输入消息，Enter 发送，Shift+Enter 换行'}
+            disabled={currentBusy}
           />
-          <button className="button button-primary send-button" onClick={() => void send()} disabled={busy || !providerId || !model}>
-            <span>{busy ? '…' : '↑'}</span>{busy ? '生成中' : '发送'}
+          <button className="button button-primary send-button" onClick={() => void send()} disabled={currentBusy || !input.trim() || !providerId || !model}>
+            {currentBusy ? '生成中' : '发送'}
           </button>
         </div>
       </section>
