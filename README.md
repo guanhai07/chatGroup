@@ -71,3 +71,15 @@ packages/
 | POST | `/api/chat/:sessionId` | 流式对话(SSE) |
 | POST | `/api/discussion/sessions` | 创建讨论会话 |
 | POST | `/api/discussion/:sessionId` | 多模型讨论(SSE) |
+
+## 冒烟测试
+
+先启动后端，再在另一个终端运行：
+
+```bash
+npm run start -w packages/server
+npm test
+```
+
+可选：`BASE_URL=http://127.0.0.1:3001 npm test`
+
