@@ -24,9 +24,19 @@ discussionRoutes.post('/sessions', async (_req, res) => {
   res.status(201).json({ id });
 });
 
+function pruneEmptyDiscussionSessions(db: ReturnType<typeof getDb>) {
+  db.prepare(`
+    DELETE FROM sessions
+    WHERE type = 'discussion'
+      AND title = 'New Session'
+      AND id NOT IN (SELECT DISTINCT session_id FROM messages)
+  `).run();
+}
+
 // Get discussion sessions
 discussionRoutes.get('/sessions', (_req, res) => {
   const db = getDb();
+  pruneEmptyDiscussionSessions(db);
   const rows = db.prepare('SELECT * FROM sessions WHERE type = ? ORDER BY updated_at DESC').all('discussion');
   res.json(rows);
 });
@@ -35,8 +45,11 @@ discussionRoutes.get('/sessions', (_req, res) => {
 discussionRoutes.delete('/sessions/:id', (req, res) => {
   const { id } = req.params;
   const db = getDb();
+  const existing = db.prepare('SELECT id FROM sessions WHERE id = ? AND type = ?').get(id, 'discussion');
+  if (!existing) return res.status(404).json({ error: 'Session not found' });
   db.prepare('DELETE FROM messages WHERE session_id = ?').run(id);
-  db.prepare('DELETE FROM sessions WHERE id = ? AND type = ?').run(id, 'discussion');
+  const result = db.prepare('DELETE FROM sessions WHERE id = ? AND type = ?').run(id, 'discussion');
+  if (result.changes === 0) return res.status(404).json({ error: 'Session not found' });
   res.json({ success: true });
 });
 

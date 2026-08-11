@@ -20,12 +20,13 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; }
+html, body, #root { height: 100%; }
+body { margin: 0; min-width: 320px; overflow: hidden; }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: 0.58; }
 
-.app-shell { display: flex; min-height: 100vh; background: #f4f6f8; }
+.app-shell { display: flex; height: 100%; max-height: 100%; overflow: hidden; background: #f4f6f8; }
 .sidebar { width: 260px; flex: 0 0 260px; display: flex; flex-direction: column; padding: 28px 18px 18px; color: #d9e4f1; background: #152331; }
 .brand { display: flex; align-items: center; gap: 11px; padding: 0 12px 38px; }
 .brand-mark { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; color: #fff; background: #2e83f6; border-radius: 12px; font-size: 14px; font-weight: 800; letter-spacing: -0.6px; line-height: 1; white-space: nowrap; box-shadow: 0 8px 20px rgba(46, 131, 246, 0.28); }
@@ -51,15 +52,15 @@ button:disabled { cursor: not-allowed; opacity: 0.58; }
 .sidebar-footer small { display: block; margin-top: 6px; color: #687e92; font-size: 10px; }
 .online-dot, .topbar-dot, .status-dot { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: #45c9a0; box-shadow: 0 0 0 4px rgba(69, 201, 160, 0.12); }
 
-.main-column { display: flex; min-width: 0; flex: 1; flex-direction: column; min-height: 0; }
+.main-column { display: flex; min-width: 0; flex: 1; flex-direction: column; min-height: 0; height: 100%; overflow: hidden; }
 .topbar { height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,0.78); }
 .breadcrumb { color: #9ba5b0; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.9px; }
 .breadcrumb span { color: #536374; }
 .breadcrumb i { margin: 0 10px; color: #c5cdd5; font-style: normal; }
 .topbar-meta { color: #718092; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.8px; }
 .topbar-dot { width: 6px; height: 6px; margin-right: 6px; box-shadow: none; }
-.content-area { flex: 1; width: 100%; max-width: none; margin: 0; padding: 24px 28px 36px; box-sizing: border-box; min-height: 0; display: flex; flex-direction: column; }
-.content-area > .page-stack { width: min(1240px, 100%); margin: 0 auto; }
+.content-area { flex: 1; width: 100%; max-width: none; margin: 0; padding: 20px 24px 24px; box-sizing: border-box; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.content-area > .page-stack { width: min(1240px, 100%); margin: 0 auto; overflow: auto; min-height: 0; flex: 1; }
 .page-stack { display: grid; gap: 28px; }
 .page-intro { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
 .eyebrow { color: #8c99a6; }
@@ -132,6 +133,7 @@ h1, h2, h3, p { margin: 0; }
 .session-item { display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; box-sizing: border-box; padding: 8px 6px; border: 0; border-radius: 9px; color: #6f7e8d; background: transparent; text-align: left; overflow: hidden; }
 .session-item:hover { background: #f4f8fc; }
 .session-item.is-active { color: #245eaa; background: #edf5ff; }
+.session-main { min-width: 0; flex: 1 1 auto; display: flex; align-items: center; overflow: hidden; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
 .session-title { min-width: 0; flex: 1 1 auto; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .session-edit { min-width: 0; flex: 1 1 auto; width: auto; max-width: 100%; padding: 4px 6px; border: 1px solid #bcd5f3; border-radius: 5px; outline: 0; font-size: 11px; }
 .session-actions { display: flex; flex: 0 0 auto; gap: 0; opacity: 1; }
@@ -195,11 +197,12 @@ h1, h2, h3, p { margin: 0; }
 .discussion-result-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 10px; flex: 0 0 auto; }
 .discussion-result-header h1 { margin-top: 4px; font-size: 20px; letter-spacing: -0.8px; }
 .round-badge { padding: 7px 10px; border-radius: 20px; color: #5c7694; background: #eaf2ff; font-size: 10px; font-weight: 700; }
-.discussion-window { flex: 1 1 auto; min-height: 420px; height: 100%; overflow-y: auto; padding: 18px; border: 1px solid var(--line); border-radius: 17px; background: linear-gradient(145deg, #fbfcfd, #f4f7fa); }
-.discussion-empty { min-height: 360px; height: 100%; display: grid; place-items: center; align-content: center; color: #9ba7b2; text-align: center; font-size: 12px; }
+.discussion-window { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; padding: 18px; border: 1px solid var(--line); border-radius: 17px; background: linear-gradient(145deg, #fbfcfd, #f4f7fa); }
+.discussion-empty { min-height: 240px; height: 100%; display: grid; place-items: center; align-content: center; color: #9ba7b2; text-align: center; font-size: 12px; }
 .discussion-empty strong { display: block; margin-bottom: 7px; color: #5f7082; font-size: 15px; }
-.discussion-message { margin-bottom: 14px; }
-.discussion-user { margin-left: auto; max-width: 78%; padding: 11px 14px; border-radius: 13px 13px 4px 13px; color: #fff; background: #256fd6; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
+.discussion-message { display: flex; flex-direction: column; align-items: stretch; margin-bottom: 14px; }
+.discussion-message.is-user { align-items: flex-end; }
+.discussion-user { width: fit-content; max-width: min(78%, 42rem); padding: 11px 14px; border-radius: 13px 13px 4px 13px; color: #fff; background: #256fd6; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
 .turn-label { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; color: #687a8b; font-family: 'DM Mono', monospace; font-size: 10px; }
 .turn-label::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #58a1ed; }
 .turn-content { padding: 12px 14px; border: 1px solid #e2e8ed; border-radius: 4px 13px 13px 13px; color: #334353; background: #fff; font-size: 12px; line-height: 1.7; box-shadow: 0 5px 15px rgba(43,61,79,.05); white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -223,7 +226,9 @@ h1, h2, h3, p { margin: 0; }
 }
 
 @media (max-width: 700px) {
-  .app-shell { display: block; }
+  html, body, #root { height: auto; }
+  body { overflow: auto; }
+  .app-shell { display: block; height: auto; max-height: none; overflow: visible; }
   .sidebar { width: 100%; padding: 14px 14px 10px; }
   .brand { padding: 0 4px 14px; }
   .sidebar-label, .sidebar-footer { display: none; }

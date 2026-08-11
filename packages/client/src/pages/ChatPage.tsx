@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { PublicProvider, Session } from '@chat-group/shared';
@@ -148,19 +148,26 @@ export function ChatPage() {
     }
   };
 
-  const deleteSession = async (id: string) => {
-    if (!confirm('确认删除该会话?')) return;
+  const deleteSession = async (id: string, event?: MouseEvent) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (!window.confirm('确认删除该会话?')) return;
     try {
       abortsRef.current.get(id)?.();
       abortsRef.current.delete(id);
       draftMessagesRef.current.delete(id);
       markStreaming(id, false);
       await api.deleteChatSession(id);
-      await loadSessions();
+      setSessions((prev) => prev.filter((session) => session.id !== id));
       if (sessionId === id) {
         setSessionId('');
         setMessages([]);
+        localStorage.removeItem('cg:lastChatSessionId');
       }
+      if (localStorage.getItem('cg:lastChatSessionId') === id) {
+        localStorage.removeItem('cg:lastChatSessionId');
+      }
+      await loadSessions();
     } catch (e: any) {
       setError(e.message || '删除会话失败');
     }
@@ -242,10 +249,6 @@ export function ChatPage() {
             <div
               className={`session-item ${sessionId === session.id ? 'is-active' : ''} ${streamingIds.has(session.id) ? 'is-streaming' : ''}`}
               key={session.id}
-              onClick={() => { if (editingTitleId !== session.id) void openSession(session.id); }}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(event) => { if (event.key === 'Enter') void openSession(session.id); }}
             >
               {editingTitleId === session.id ? (
                 <input
@@ -270,17 +273,26 @@ export function ChatPage() {
                 />
               ) : (
                 <>
-                  <span className="session-title" title={session.title}>{session.title || '未命名会话'}</span>
+                  <button
+                    type="button"
+                    className="session-main"
+                    onClick={() => void openSession(session.id)}
+                    title={session.title}
+                  >
+                    <span className="session-title">{session.title || '未命名会话'}</span>
+                  </button>
                   <div className="session-actions">
                     <button
+                      type="button"
                       className="session-rename"
-                      onClick={(event) => { event.stopPropagation(); beginRename(session); }}
+                      onClick={(event) => { event.preventDefault(); event.stopPropagation(); beginRename(session); }}
                       title="重命名"
                       aria-label="重命名"
                     >✎</button>
                     <button
+                      type="button"
                       className="session-delete"
-                      onClick={(event) => { event.stopPropagation(); void deleteSession(session.id); }}
+                      onClick={(event) => void deleteSession(session.id, event)}
                       title="删除会话"
                       aria-label="删除会话"
                     >×</button>

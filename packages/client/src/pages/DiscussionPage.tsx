@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { PublicProvider, DiscussionTurn, Session } from '@chat-group/shared';
 import { api, streamDiscussion } from '../api';
 
@@ -78,12 +78,21 @@ export function DiscussionPage() {
   const sessionIdRef = useRef(sessionId);
   const draftRef = useRef<Map<string, DiscussionMessage[]>>(new Map());
   const abortsRef = useRef<Map<string, () => void>>(new Map());
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const windowRef = useRef<HTMLDivElement>(null);
 
   sessionIdRef.current = sessionId;
+  const running = !!sessionId && runningIds.has(sessionId);
+
   useEffect(() => {
     if (sessionId) localStorage.setItem('cg:lastDiscussionSessionId', sessionId);
   }, [sessionId]);
-  const running = !!sessionId && runningIds.has(sessionId);
+
+  useEffect(() => {
+    const pane = windowRef.current;
+    if (!pane) return;
+    pane.scrollTop = pane.scrollHeight;
+  }, [messages, running]);
 
   const markRunning = (id: string, active: boolean) => {
     setRunningIds((prev) => {
@@ -153,14 +162,21 @@ export function DiscussionPage() {
     }));
   };
 
-  const startSession = async (opts?: { clearPrompt?: boolean }): Promise<string> => {
-    const created = await api.createDiscussionSession();
-    setSessionId(created.id);
+  const resetComposer = (opts?: { clearPrompt?: boolean }) => {
+    setSessionId('');
     setMessages([]);
-    draftRef.current.set(created.id, []);
     if (opts?.clearPrompt) setPrompt('');
     setEditingTitleId(null);
     setError('');
+    localStorage.removeItem('cg:lastDiscussionSessionId');
+  };
+
+  const ensureSession = async (): Promise<string> => {
+    // 当前是空会话则复用；否则新建，避免空 New Session 堆积
+    if (sessionId && messages.length === 0) return sessionId;
+    const created = await api.createDiscussionSession();
+    setSessionId(created.id);
+    draftRef.current.set(created.id, []);
     await loadSessions();
     return created.id;
   };
@@ -210,19 +226,26 @@ export function DiscussionPage() {
     }
   };
 
-  const deleteSession = async (id: string) => {
-    if (!confirm('确认删除该讨论?')) return;
+  const deleteSession = async (id: string, event?: MouseEvent) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (!window.confirm('确认删除该讨论?')) return;
     try {
       abortsRef.current.get(id)?.();
       abortsRef.current.delete(id);
       draftRef.current.delete(id);
       markRunning(id, false);
       await api.deleteDiscussionSession(id);
-      await loadSessions();
+      setSessions((prev) => prev.filter((session) => session.id !== id));
       if (sessionId === id) {
         setSessionId('');
         setMessages([]);
+        localStorage.removeItem('cg:lastDiscussionSessionId');
       }
+      if (localStorage.getItem('cg:lastDiscussionSessionId') === id) {
+        localStorage.removeItem('cg:lastDiscussionSessionId');
+      }
+      await loadSessions();
     } catch (e: any) {
       setError(e.message || '删除讨论失败');
     }
@@ -239,9 +262,7 @@ export function DiscussionPage() {
     setError('');
 
     try {
-      let sid = sessionId;
-      // 已有内容的历史会话上再开讨论时，新建一条记录，避免串台
-      if (!sid || messages.length > 0) sid = await startSession();
+      const sid = await ensureSession();
 
       const initial: DiscussionMessage[] = [{ type: 'user', content: prompt.trim() }];
       draftRef.current.set(sid, initial);
@@ -313,7 +334,7 @@ export function DiscussionPage() {
       <aside className="session-sidebar">
         <div className="session-sidebar-header">
           <strong>讨论历史</strong>
-          <button className="new-session" onClick={() => void startSession({ clearPrompt: true })} title="新建讨论" aria-label="新建讨论">+</button>
+          <button className="new-session" type="button" onClick={() => resetComposer({ clearPrompt: true })} title="新建讨论" aria-label="新建讨论">+</button>
         </div>
         <div className="session-list">
           {sessions.length === 0 && <span className="muted">还没有讨论记录</span>}
@@ -321,10 +342,6 @@ export function DiscussionPage() {
             <div
               className={`session-item ${sessionId === session.id ? 'is-active' : ''} ${runningIds.has(session.id) ? 'is-streaming' : ''}`}
               key={session.id}
-              onClick={() => { if (editingTitleId !== session.id) void openSession(session.id); }}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(event) => { if (event.key === 'Enter') void openSession(session.id); }}
             >
               {editingTitleId === session.id ? (
                 <input
@@ -349,17 +366,26 @@ export function DiscussionPage() {
                 />
               ) : (
                 <>
-                  <span className="session-title" title={session.title}>{session.title || '未命名讨论'}</span>
+                  <button
+                    type="button"
+                    className="session-main"
+                    onClick={() => void openSession(session.id)}
+                    title={session.title}
+                  >
+                    <span className="session-title">{session.title || '未命名讨论'}</span>
+                  </button>
                   <div className="session-actions">
                     <button
+                      type="button"
                       className="session-rename"
-                      onClick={(event) => { event.stopPropagation(); beginRename(session); }}
+                      onClick={(event) => { event.preventDefault(); event.stopPropagation(); beginRename(session); }}
                       title="重命名"
                       aria-label="重命名"
                     >✎</button>
                     <button
+                      type="button"
                       className="session-delete"
-                      onClick={(event) => { event.stopPropagation(); void deleteSession(session.id); }}
+                      onClick={(event) => void deleteSession(session.id, event)}
                       title="删除讨论"
                       aria-label="删除讨论"
                     >×</button>
@@ -438,11 +464,11 @@ export function DiscussionPage() {
             </div>
             {running && <span className="round-badge"><span className="online-dot" />进行中</span>}
           </div>
-          <div className="discussion-window">
+          <div className="discussion-window" ref={windowRef}>
             {messages.length === 0 ? (
               <div className="discussion-empty"><div><strong>准备好开始一场讨论</strong><span>左侧可恢复历史，中间配置模型与主题</span></div></div>
             ) : messages.map((message, index) => {
-              if (message.type === 'user') return <div className="discussion-message" key={index}><div className="discussion-user">{message.content}</div></div>;
+              if (message.type === 'user') return <div className="discussion-message is-user" key={index}><div className="discussion-user">{message.content}</div></div>;
               if (message.type === 'summary') return <div className="summary-card" key={index}><strong>✦ 最终总结</strong><div>{message.content}</div></div>;
               if (message.type === 'error') return <div className="discussion-error" key={index}>! {message.content}</div>;
               return (
@@ -452,6 +478,7 @@ export function DiscussionPage() {
                 </div>
               );
             })}
+            <div ref={bottomRef} />
           </div>
         </section>
       </div>
