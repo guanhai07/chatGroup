@@ -1,0 +1,16 @@
+{
+  "name": "chat-group",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "start": "npm run start -w packages/server",
+    "serve": "npm run build -w packages/client && npm run start -w packages/server",
+    "test": "npx tsx packages/server/scripts/smoke.ts"
+  },
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/client"
+  ]
+}

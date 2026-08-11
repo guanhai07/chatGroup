@@ -1,0 +1,28 @@
+{
+  "name": "@chat-group/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "serve": "npm run build -w packages/client && node dist/index.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "nanoid": "^5.0.7",
+    "undici": "^6.19.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^22.5.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.4"
+  }
+}
